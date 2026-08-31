@@ -1,29 +1,50 @@
-// // create sveltekit server function to return data to page on load
-// export async function load({ fetch }) {
-//   const res = await fetch(`http://localhost:5000/predict?day_of_week=3&airport_id=14771`)
-//   const result = await res.json()
-//   console.log(result)
-//   return result
-// }
+// Create sveltekit server function to return data to page on load
+
+import { PUBLIC_API_BASE_URL } from '$env/static/public';
 
 export async function load({ fetch }) {
-  const res = await fetch(`http://localhost:5000/airports`);
+  const apiUrl = PUBLIC_API_BASE_URL || 'http://localhost:5000';
+  const res = await fetch(`${apiUrl}/airports`);
   const airports = await res.json();
-  // console.log({airports})
-  return {airports};
+  return { airports };
 }
 
 export const actions = {
-  getDelay: async ({fetch, request}) => {
-    // get form data
-    const data = await request.formData();
+  getDelay: async ({ fetch, request }) => {
+    try {
+      const apiUrl = PUBLIC_API_BASE_URL || 'http://localhost:5000';
+      const data = await request.formData();
 
-    const day_of_week = data.get('day');
-    const airport_id = data.get('airport');
+      const day_of_week = data.get('day');
+      const airport_id = data.get('airport');
 
-    // make request to server
-    const res = await fetch(`http://localhost:5000/predict?day_of_week=${day_of_week}&airport_id=${airport_id}`)
-    const result = await res.json();
-    return {result};
-  }
-}
+      // Validate inputs before sending
+      if (!day_of_week || !airport_id) {
+        return { error: 'Missing required parameters' };
+      }
+
+      // Use URLSearchParams for safe parameter encoding
+      const params = new URLSearchParams();
+      params.append('day_of_week', String(day_of_week));
+      params.append('airport_id', String(airport_id));
+
+      const res = await fetch(`${apiUrl}/predict?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        return { error: error.error || 'Prediction failed' };
+      }
+
+      const result = await res.json();
+      return { result };
+    } catch (err) {
+      console.error('Error fetching prediction:', err);
+      return { error: 'Failed to fetch prediction' };
+    }
+  },
+};
